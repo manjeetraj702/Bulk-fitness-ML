@@ -7,6 +7,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score
 import uvicorn
+import os
 
 app = FastAPI(title="Bulky Fitness Dynamic AI Prediction Engine")
 
@@ -39,11 +40,11 @@ def train_fit_model():
     height = np.random.uniform(140, 210, n_samples)
     goal_encoded = np.random.randint(0, 3, n_samples)  # 0: Cut, 1: Maintain, 2: Bulk
     
-    # 🎯 FIX: Core Basal Metabolic Rate (BMR) Calculation Matrix
+    # Core Basal Metabolic Rate (BMR) Calculation Matrix
     # Derived from established exercise science equations where weight and height act as primary drivers
     base_bmr = (10.0 * weight) + (6.25 * height) - (5.0 * age)
     
-    # 🎯 FIX: Apply Goal Modifiers as Dynamic Scalars instead of static flat numbers
+    # Apply Goal Modifiers as Dynamic Scalars instead of static flat numbers
     # Cut = -15% Deficit, Maintain = Balanced TDEE baseline, Bulk = +20% Surplus
     calories = np.where(goal_encoded == 0, base_bmr * 0.85, 
                np.where(goal_encoded == 2, base_bmr * 1.20, base_bmr * 1.05))
@@ -51,7 +52,7 @@ def train_fit_model():
     # Inject minimal background variance noise (reduced from 50 to 10 to protect feature weights)
     calories += np.random.normal(0, 10, n_samples)
 
-    # 🎯 FIX: Calculate Macronutrient Metrics directly proportional to Body Weight
+    # Calculate Macronutrient Metrics directly proportional to Body Weight
     protein = np.where(goal_encoded == 0, weight * 2.2,
               np.where(goal_encoded == 2, weight * 2.0, weight * 1.7))
     
@@ -175,7 +176,10 @@ def get_diagnostics():
 
 
 # -------------------------------------------------------------
-# 6. SERVER RUNTIME ENTRYPOINT
+# 6. SERVER RUNTIME ENTRYPOINT (OPTIMIZED FOR CLOUD PORT BINDING)
 # -------------------------------------------------------------
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=5001)
+    # 🎯 Render injects an environment variable named 'PORT' at startup.
+    # This block intercepts it dynamically, falling back to 5001 if testing locally.
+    assigned_port = int(os.environ.get("PORT", 5001))
+    uvicorn.run(app, host="0.0.0.0", port=assigned_port) 
