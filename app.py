@@ -8,8 +8,43 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score
 import os
 import uvicorn
+import asyncio
+import httpx
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="Bulky Fitness Dynamic AI Prediction Engine")
+# ============================================================
+# 💓 LIGHTWEIGHT NON-BLOCKING KEEP-ALIVE HEARBEAT THREAD
+# ============================================================
+async def keep_alive_scheduler():
+    """Defensive standalone thread loop that keeps the Render microservice awake."""
+    # 🎯 FIX: Wait a safe 30 seconds for Uvicorn to fully bind the public networking ports first!
+    await asyncio.sleep(30)
+    
+    async with httpx.AsyncClient() as client:
+        while True:
+            try:
+                assigned_port = os.environ.get("PORT", "5001")
+                # Loopback check directly against local machine port context arrays
+                target_url = f"http://127.0.0.1:{assigned_port}/"
+                response = await client.get(target_url, timeout=5.0)
+                if response.status_code == 200:
+                    print("💓 ML Keep-Alive Heartbeat: Container Warmth Verified.")
+            except Exception as e:
+                print(f"⚠️ Keep-Alive heartbeat skipped: {str(e)}")
+            
+            # Sleep the worker thread for exactly 11 minutes (660 seconds)
+            await asyncio.sleep(660)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 🎯 FIX: Use create_task to launch the loop completely decoupled from the main thread stack
+    loop_task = asyncio.create_task(keep_alive_scheduler())
+    yield
+    # Cleanup task references gracefully on platform shutdown cycles
+    loop_task.cancel()
+
+# Initialize the engine utilizing the robust non-blocking lifespan framework
+app = FastAPI(title="Bulky Fitness Dynamic AI Prediction Engine", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -64,7 +99,11 @@ def train_fit_model():
 
 ml_model = train_fit_model()
 
-# 🎯 DATA GATEWAY SECURITY: Matches camelCase layout keys dispatched from your Spring controllers
+# Lightweight root checkpoint target endpoint for self-pings
+@app.get("/")
+def health_checkpoint():
+    return {"status": "warm", "service": "Bulky Fitness ML Engine Node"}
+
 class PredictRequest(BaseModel):
     age: int
     weightKg: float
@@ -77,7 +116,6 @@ def predict_metrics(req: PredictRequest):
         raw_goal = req.optimizationGoal.lower()
         goal_val = 0 if "cut" in raw_goal else (2 if "bulk" in raw_goal else 1)
 
-        # 🎯 FIX: Explicitly translate incoming keys into the exact names used during model fitting
         features = pd.DataFrame([{
             "age": int(req.age),
             "weight": float(req.weightKg),
