@@ -64,6 +64,7 @@ def train_fit_model():
 
 ml_model = train_fit_model()
 
+# 🎯 DATA GATEWAY SECURITY: Matches camelCase layout keys dispatched from your Spring controllers
 class PredictRequest(BaseModel):
     age: int
     weightKg: float
@@ -76,11 +77,24 @@ def predict_metrics(req: PredictRequest):
         raw_goal = req.optimizationGoal.lower()
         goal_val = 0 if "cut" in raw_goal else (2 if "bulk" in raw_goal else 1)
 
-        features = pd.DataFrame([{"age": req.age, "weight": req.weightKg, "height": req.heightCm, "goal": goal_val}])
+        # 🎯 FIX: Explicitly translate incoming keys into the exact names used during model fitting
+        features = pd.DataFrame([{
+            "age": int(req.age),
+            "weight": float(req.weightKg),
+            "height": float(req.heightCm),
+            "goal": int(goal_val)
+        }])
+
         pred = ml_model.predict(features)[0]
 
-        return {"calories": int(pred[0]), "protein": int(pred[1]), "carbs": int(pred[2]), "fats": int(pred[3])}
+        return {
+            "calories": int(pred[0]),
+            "protein": int(pred[1]),
+            "carbs": int(pred[2]),
+            "fats": int(pred[3])
+        }
     except Exception as e:
+        print(f"❌ Prediction Pipeline Interception Error: {str(e)}")
         return {"error": str(e)}
 
 class CalorieCalculatorRequest(BaseModel):
@@ -91,12 +105,12 @@ class CalorieCalculatorRequest(BaseModel):
 def calculate_calories(req: CalorieCalculatorRequest):
     key = req.foodKey.lower().strip()
     if key not in INDIAN_FOOD_METRICS:
-        return {"error": "Food profile missing."}
+        return {"error": "Food registry signature missing."}
     
     try:
         amount = float(req.quantityAmount)
     except (ValueError, TypeError):
-        return {"error": "Invalid numerical amount processing value."}
+        return {"error": "Invalid density configuration value."}
 
     base = INDIAN_FOOD_METRICS[key]
     scalar = amount if base["unit"] in ["per piece", "per whole egg"] else amount / 100.0
